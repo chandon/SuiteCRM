@@ -83,7 +83,7 @@ class CalendarGrid {
                if($this->cal->time_step < 30)
                     $this->scroll_height = 480;
                else
-                    $this->scroll_height = $this->cal->celcount * 15 + 1;
+                    $this->scroll_height = 48 * 15 + 1;
            }
         }
 
