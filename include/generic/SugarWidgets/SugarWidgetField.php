@@ -108,11 +108,7 @@ class SugarWidgetField extends SugarWidget {
 		$this->local_current_module = $_REQUEST['module'];
 		$this->is_dynamic = true;
 		// don't show sort links if name isn't defined
-		if ((empty ($layout_def['name']) || (isset ($layout_def['sortable']) && !$layout_def['sortable']))
-        && !empty ($layout_def['label'])) {
-			return $layout_def['label'];
-		}
-		if (isset ($layout_def['sortable']) && !$layout_def['sortable']) {
+		if (empty ($layout_def['name']) || (isset ($layout_def['sortable']) && !$layout_def['sortable'])) {
 			return $this->displayHeaderCellPlain($layout_def);
 		}
 
@@ -121,7 +117,8 @@ class SugarWidgetField extends SugarWidget {
 		$subpanel_module = $layout_def['subpanel_module'];
 		$html_var = $subpanel_module . "_CELL";
 		if (empty ($this->base_URL)) {
-			$this->base_URL = ListView :: getBaseURL($html_var);
+			$objListView = new ListView();
+			$this->base_URL = $objListView -> getBaseURL($html_var);
 			$split_url = explode('&to_pdf=true&action=SubPanelViewer&subpanel=', $this->base_URL);
 			$this->base_URL = $split_url[0];
 			$this->base_URL .= '&inline=true&to_pdf=true&action=SubPanelViewer&subpanel=';
@@ -131,7 +128,8 @@ class SugarWidgetField extends SugarWidget {
 			$sort_by_name = $layout_def['sort_by'];
 		}
 
-		$sort_by = ListView :: getSessionVariableName($html_var, "ORDER_BY").'='.$sort_by_name;
+		$objListView = new ListView();
+		$sort_by = $objListView->getSessionVariableName($html_var, "ORDER_BY").'='.$sort_by_name;
 
 		$start = (empty ($layout_def['start_link_wrapper'])) ? '' : $layout_def['start_link_wrapper'];
 		$end = (empty ($layout_def['end_link_wrapper'])) ? '' : $layout_def['end_link_wrapper'];
@@ -144,9 +142,8 @@ class SugarWidgetField extends SugarWidget {
 		if (isset ($layout_def['sort'])) {
 			$imgArrow = $layout_def['sort'];
 		}
-
-		$arrow_start = ListView::getArrowUpDownStart($imgArrow);
-		$arrow_end = ListView::getArrowUpDownEnd($imgArrow);
+		$arrow_start = $objListView->getArrowUpDownStart($imgArrow);
+		$arrow_end = $objListView->getArrowUpDownEnd($imgArrow);
 		$header_cell .= " ".$arrow_start.$arrow_end."</a>";
 
 		return $header_cell;

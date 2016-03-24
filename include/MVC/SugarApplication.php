@@ -2,9 +2,9 @@
 /*********************************************************************************
  * SugarCRM Community Edition is a customer relationship management program developed by
  * SugarCRM, Inc. Copyright (C) 2004-2013 SugarCRM Inc.
-
+ *
  * SuiteCRM is an extension to SugarCRM Community Edition developed by Salesagility Ltd.
- * Copyright (C) 2011 - 2014 Salesagility Ltd.
+ * Copyright (C) 2011 - 2016 Salesagility Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -84,9 +84,7 @@ class SugarApplication
 
         SugarThemeRegistry::buildRegistry();
         $this->loadLanguages();
-		$this->checkDatabaseVersion();
 		$this->loadDisplaySettings();
-		//$this->loadLicense();
 		$this->loadGlobals();
 		$this->setupResourceManagement($module);
 		$this->controller->execute();
@@ -128,6 +126,10 @@ class SugarApplication
                     $this->controller->action = '';
                     $this->controller->module = '';
                 }
+				elseif(strtolower($this->controller->module) == 'alerts' && strtolower($this->controller->action) == 'get') {
+					echo 'lost session';
+					exit();
+				}
 			}
 
             $authController->authController->redirectToLogin($this);
@@ -428,7 +430,7 @@ class SugarApplication
 
         if(!is_null($theme) && !headers_sent())
         {
-            setcookie('sugar_user_theme', $theme, time() + 31536000); // expires in a year
+            setcookie('sugar_user_theme', $theme, time() + 31536000, null, null, false, true); // expires in a year
         }
 
         SugarThemeRegistry::set($theme);
@@ -631,7 +633,7 @@ class SugarApplication
 	 * @access	public
 	 * @param	string	$url	The URL to redirect to
 	 */
- 	function redirect(
+ 	static function redirect(
  	    $url
  	    )
 	{
@@ -700,7 +702,7 @@ class SugarApplication
 	    $path = '/',
 	    $domain = null,
 	    $secure = false,
-	    $httponly = false
+	    $httponly = true
 	    )
 	{
 	    if ( is_null($domain) )

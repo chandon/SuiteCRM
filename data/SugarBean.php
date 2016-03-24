@@ -1036,8 +1036,8 @@ class SugarBean
      * Method will load the relationship if not done so already.
      *
      * @param string $field_name relationship to be loaded.
-     * @param string $bean name  class name of the related bean.
-     * @param array $sort_array optional, unused
+     * @param string $bean name  class name of the related bean.legacy
+     * @param string $order_by, Optional, default empty.
      * @param int $begin_index Optional, default 0, unused.
      * @param int $end_index Optional, default -1
      * @param int $deleted Optional, Default 0, 0  adds deleted=0 filter, 1  adds deleted=1 filter.
@@ -1045,8 +1045,7 @@ class SugarBean
      *
      * Internal function, do not override.
      */
-    function get_linked_beans($field_name,$bean_name, $sort_array = array(), $begin_index = 0, $end_index = -1,
-                              $deleted=0, $optional_where="")
+    function get_linked_beans($field_name,$bean_name = '', $order_by = '', $begin_index = 0, $end_index = -1, $deleted=0, $optional_where="")
     {
         //if bean_name is Case then use aCase
         if($bean_name=="Case")
@@ -1055,14 +1054,15 @@ class SugarBean
         if($this->load_relationship($field_name)) {
             if ($this->$field_name instanceof Link) {
                 // some classes are still based on Link, e.g. TeamSetLink
-                return array_values($this->$field_name->getBeans(new $bean_name(), $sort_array, $begin_index, $end_index, $deleted, $optional_where));
+                return array_values($this->$field_name->getBeans(new $bean_name(), $order_by, $begin_index, $end_index, $deleted, $optional_where));
             } else {
                 // Link2 style
-                if ($end_index != -1 || !empty($deleted) || !empty($optional_where))
+                if ($end_index != -1 || !empty($deleted) || !empty($optional_where) || !empty($order_by))
                     return array_values($this->$field_name->getBeans(array(
                         'where' => $optional_where,
                         'deleted' => $deleted,
-                        'limit' => ($end_index - $begin_index)
+                        'limit' => ($end_index - $begin_index),
+                        'order_by' => $order_by
                     )));
                 else
                     return array_values($this->$field_name->getBeans());
@@ -2346,16 +2346,17 @@ class SugarBean
 // save related fields values for audit
          foreach ($this->get_related_fields() as $rel_field_name)
          {
-             if (! empty($this->$rel_field_name['name']))
+             $field_name = $rel_field_name['name'];
+             if (! empty($this->$field_name))
              {
-                 $this->fetched_rel_row[$rel_field_name['name']] = $this->$rel_field_name['name'];
+                 $this->fetched_rel_row[$rel_field_name['name']] = $this->$field_name;
              }
          }
         //make a copy of fields in the relationship_fields array. These field values will be used to
         //clear relationship.
         foreach ( $this->field_defs as $key => $def )
         {
-            if ($def [ 'type' ] == 'relate' && isset ( $def [ 'id_name'] ) && isset ( $def [ 'link'] ) && isset ( $def[ 'save' ])) {
+            if (isset($def [ 'type' ]) && $def [ 'type' ] == 'relate' && isset ( $def [ 'id_name'] ) && isset ( $def [ 'link'] ) && isset ( $def[ 'save' ])) {
                 if (isset($this->$key)) {
                     $this->rel_fields_before_value[$key]=$this->$key;
                     if (isset($this->$def [ 'id_name']))
@@ -2398,7 +2399,7 @@ class SugarBean
         $nullvalue='';
         foreach($this->field_defs as $field=>$field_value)
         {
-            if($field == 'user_preferences' && $this->module_dir == 'Users')
+            if(($field == 'user_preferences' && $this->module_dir == 'Users') || ($field == 'internal' && $this->module_dir == 'Cases') )
                 continue;
             if(isset($row[$field]))
             {
@@ -2880,7 +2881,7 @@ class SugarBean
      *
      * Internal Function, do not overide.
      */
-    function get_union_related_list($parentbean, $order_by = "", $sort_order='', $where = "",
+    static function get_union_related_list($parentbean, $order_by = "", $sort_order='', $where = "",
     $row_offset = 0, $limit=-1, $max=-1, $show_deleted = 0, $subpanel_def)
     {
         $secondary_queries = array();
@@ -3258,6 +3259,9 @@ class SugarBean
 			if ($addrelatefield)
 				$addrelate[$addrelatefield] = true;
 		}
+		if(!empty($this->field_defs[$field]['id_name'])){
+			$addrelate[$this->field_defs[$field]['id_name']] = true;
+		}
 	}
 
 	$fields = array_merge($addrelate, $fields);
@@ -3343,7 +3347,7 @@ class SugarBean
             //Parent Field
             if ($data['type'] == 'parent') {
                 //See if we need to join anything by inspecting the where clause
-                $match = preg_match('/(^|[\s(])parent_(\w+)_(\w+)\.name/', $where, $matches);
+                $match = preg_match('/(^|[\s(])parent_([a-zA-Z]+_?[a-zA-Z]+)_([a-zA-Z]+_?[a-zA-Z]+)\.name/', $where, $matches);
                 if ($match) {
                     $joinTableAlias = 'jt' . $jtcount;
                     $joinModule = $matches[2];
@@ -3375,8 +3379,9 @@ class SugarBean
 
             if ($this->is_relate_field($field))
             {
-                $this->load_relationship($data['link']);
-                if(!empty($this->$data['link']))
+                $linkField = $data['link'];
+                $this->load_relationship($linkField);
+                if(!empty($this->$linkField))
                 {
                     $params = array();
                     if(empty($join_type))
@@ -3406,9 +3411,9 @@ class SugarBean
                     }
                     $join_primary = !isset($data['join_primary']) || $data['join_primary'];
 
-                    $join = $this->$data['link']->getJoin($params, true);
+                    $join = $this->$linkField->getJoin($params, true);
                     $used_join_key[] = $join['rel_key'];
-                    $rel_module = $this->$data['link']->getRelatedModuleName();
+                    $rel_module = $this->$linkField->getRelatedModuleName();
                     $table_joined = !empty($joined_tables[$params['join_table_alias']]) || (!empty($joined_tables[$params['join_table_link_alias']]) && isset($data['link_type']) && $data['link_type'] == 'relationship_info');
 
 					//if rname is set to 'name', and bean files exist, then check if field should be a concatenated name
@@ -3653,7 +3658,9 @@ class SugarBean
 		foreach ($this->field_defs as $field_def => $value)
 		{
 			if (isset($value['relationship_fields']) && 
-				in_array($field, $value['relationship_fields']) )
+				in_array($field, $value['relationship_fields']) &&
+                (!isset($value['link_type']) || $value['link_type'] != 'relationship_info')
+            )
 				return $field_def;
 		}
 
@@ -3974,7 +3981,7 @@ class SugarBean
             }
             if(!empty($rows_found) && (empty($limit) || $limit == -1))
             {
-                $limit = $sugar_config['list_max_entries_per_subpanel'];
+                $limit = $max_per_page;
             }
             if( $toEnd)
             {
@@ -4532,6 +4539,7 @@ class SugarBean
 	{
 		global $current_user;
 		$date_modified = $GLOBALS['timedate']->nowDb();
+        $id = $this->db->quote($id);
 		if(isset($_SESSION['show_deleted']))
 		{
 			$this->mark_undeleted($id);
@@ -4581,7 +4589,7 @@ class SugarBean
         $this->call_custom_logic("before_restore", $custom_logic_arguments);
 
 		$date_modified = $GLOBALS['timedate']->nowDb();
-		$query = "UPDATE $this->table_name set deleted=0 , date_modified = '$date_modified' where id='$id'";
+		$query = "UPDATE $this->table_name set deleted=0 , date_modified = '$date_modified' where id='" . $this->db->quote($id) ."'";
 		$this->db->query($query, true,"Error marking record undeleted: ");
 
         $this->restoreFiles();
